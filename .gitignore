@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.spec.bak
+belt_config.json
+
+# C# / .NET
+bin/
+obj/
+*.user
+.vs/
+
+# Arduino / IDE
+*.DS_Store
+.arduino15/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.suo

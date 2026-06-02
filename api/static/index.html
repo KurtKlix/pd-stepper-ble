@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PD-Stepper Control</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <div id="conn-indicator"></div>
+  <h1>PD&#8209;<span>Stepper</span> Control</h1>
+  <span id="conn-label">Disconnected</span>
+</header>
+
+<main>
+
+  <!-- ── Connection ──────────────────────────────────────────────────────── -->
+  <section class="panel" id="panel-connect">
+    <h2>Connection</h2>
+    <button class="btn-secondary btn-wide" id="btn-scan">&#x1F50D; Scan for Devices</button>
+    <ul id="device-list"></ul>
+    <div id="connect-row" class="row mt8" style="display:none">
+      <button class="btn-primary" id="btn-connect" style="flex:1">Connect</button>
+      <button class="btn-danger" id="btn-disconnect" disabled style="flex:1">Disconnect</button>
+    </div>
+    <div class="mt8" style="display:flex;align-items:center;gap:10px;font-size:13px;">
+      <span style="color:var(--text-muted)">Bus voltage:</span>
+      <span id="voltage-display" style="font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums">—</span>
+    </div>
+    <button class="btn-primary btn-wide mt8" id="btn-home" disabled>&#x2302; Home (Endstop)</button>
+  </section>
+
+  <!-- ── Position control ───────────────────────────────────────────────── -->
+  <section class="panel" id="panel-position">
+    <h2>Position</h2>
+    <div style="display:flex;gap:16px;align-items:flex-end;justify-content:center;margin-bottom:8px">
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">mm</div>
+        <div class="pos-display" id="pos-display-mm" style="font-size:36px">—<span style="font-size:16px">mm</span></div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">degrees</div>
+        <div class="pos-display" id="pos-display" style="font-size:24px;color:var(--text-muted)">—<span>°</span></div>
+      </div>
+    </div>
+    <div class="abs-row">
+      <div style="flex:1">
+        <label>Absolute target (mm)</label>
+        <input type="number" id="abs-input-mm" value="0" step="0.1">
+      </div>
+      <button class="btn-primary" id="btn-move-abs-mm" disabled>Move</button>
+    </div>
+    <div class="jog-row mt12">
+      <button class="btn-secondary" data-rel-mm="-10"  disabled>−10mm</button>
+      <button class="btn-secondary" data-rel-mm="-1"   disabled>−1mm</button>
+      <button class="btn-secondary" data-rel-mm="-0.1" disabled>−0.1</button>
+      <button class="btn-secondary" data-rel-mm="0.1"  disabled>+0.1</button>
+      <button class="btn-secondary" data-rel-mm="1"    disabled>+1mm</button>
+      <button class="btn-secondary" data-rel-mm="10"   disabled>+10mm</button>
+    </div>
+  </section>
+
+  <!-- ── Velocity control ───────────────────────────────────────────────── -->
+  <section class="panel" id="panel-velocity">
+    <h2>Velocity</h2>
+    <div class="vel-value"><span id="vel-display">0</span> mm/s</div>
+    <input type="range" id="vel-slider" min="-200" max="200" value="0" step="0.5" disabled>
+    <div class="vel-labels"><span>−200 mm/s</span><span>0</span><span>+200 mm/s</span></div>
+    <div class="row mt12">
+      <button class="btn-primary" id="btn-set-vel" disabled style="flex:1">Set Velocity</button>
+      <button class="btn-danger"  id="btn-stop"    disabled style="flex:1">&#x23F9; Stop</button>
+    </div>
+  </section>
+
+  <!-- ── Configuration ──────────────────────────────────────────────────── -->
+  <section class="panel" id="panel-config">
+    <h2>Configuration</h2>
+    <div class="config-grid">
+      <div>
+        <label>Current (mA)</label>
+        <input type="number" id="cfg-current" value="800" min="0" max="3000" step="50">
+      </div>
+      <div>
+        <label>Microsteps</label>
+        <select id="cfg-microsteps">
+          <option>1</option><option>2</option><option>4</option><option>8</option>
+          <option value="16" selected>16</option>
+          <option>32</option><option>64</option><option>256</option>
+        </select>
+      </div>
+      <div>
+        <label>Speed (steps/s)</label>
+        <input type="number" id="cfg-speed" value="800" min="1" max="20000" step="100">
+      </div>
+      <div>
+        <label>Closed-loop</label>
+        <select id="cfg-closed-loop">
+          <option value="0">Open loop</option>
+          <option value="1" selected>Encoder closed</option>
+        </select>
+      </div>
+      <div>
+        <label>Direction</label>
+        <select id="cfg-dir">
+          <option value="1" selected>Normal</option>
+          <option value="-1">Reversed</option>
+        </select>
+      </div>
+      <div>
+        <label>Belt travel (mm/rev)</label>
+        <input type="number" id="cfg-mm-per-rev" value="40" min="0.1" step="0.1"
+               title="GT2 20-tooth = 40mm, GT2 16-tooth = 32mm, etc.">
+      </div>
+      <div>
+        <label>Endstop type</label>
+        <select id="cfg-endstop-mode">
+          <option value="NO" selected>NO — Normally Open</option>
+          <option value="NC">NC — Normally Closed</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="btn-primary btn-wide" id="btn-apply-cfg" disabled>Apply</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Event log ──────────────────────────────────────────────────────── -->
+  <section class="panel" id="panel-events">
+    <h2>Event Log <button class="btn-secondary" id="btn-clear-log" style="font-size:11px;padding:3px 8px;float:right">Clear</button></h2>
+    <div id="event-log"></div>
+  </section>
+
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
