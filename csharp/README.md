@@ -19,7 +19,7 @@ Copy `PDStepperClient.cs` and `Models.cs` into your project, or reference the `.
 </ItemGroup>
 ```
 
-Target framework: **.NET 8.0** or later.
+Target frameworks: **.NET 8.0** and **.NET 10.0** (multi-targeted).
 
 ---
 
