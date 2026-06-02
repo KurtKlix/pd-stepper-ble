@@ -7,12 +7,14 @@ public:
     void init();
     void processNotifications();  // call every loop iteration
     void postEvent(const char* json);  // thread-safe event enqueue
-    bool isConnected() const { return _connected; }
-    void setConnected(bool val) { _connected = val; }
+    bool    isConnected()    const { return _connectionCount > 0; }
+    uint8_t connectionCount() const { return _connectionCount; }
+    void clientConnected();
+    void clientDisconnected();
 
 private:
-    bool     _connected = false;
-    uint32_t _lastStatusMs = 0;
+    uint8_t  _connectionCount = 0;
+    uint32_t _lastStatusMs    = 0;
 
     NimBLECharacteristic* _pStatusChar  = nullptr;
     NimBLECharacteristic* _pConfigChar  = nullptr;

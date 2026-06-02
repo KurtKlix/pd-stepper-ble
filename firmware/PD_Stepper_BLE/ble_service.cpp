@@ -61,16 +61,22 @@ class CommandCallback : public NimBLECharacteristicCallbacks {
 
 class ServerCallbacks : public NimBLEServerCallbacks {
     void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) override {
-        bleService.setConnected(true);
-        Serial.println("[BLE] client connected");
+        bleService.clientConnected();
+        Serial.printf("[BLE] client connected (%d total)\n", bleService.connectionCount());
+        // Keep advertising so additional clients (phone, API) can also connect
+        NimBLEDevice::getAdvertising()->start();
     }
     void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) override {
-        bleService.setConnected(false);
-        Serial.println("[BLE] client disconnected — stopping motor");
-        // Safety: stop motor when host disconnects
-        JsonDocument doc;
-        doc["cmd"] = "stop";
-        motorControl.applyCommand(doc);
+        bleService.clientDisconnected();
+        Serial.printf("[BLE] client disconnected (%d remaining)\n", bleService.connectionCount());
+        if (bleService.connectionCount() == 0) {
+            // Only stop the motor when ALL clients are gone
+            JsonDocument doc;
+            doc["cmd"] = "stop";
+            motorControl.applyCommand(doc);
+            Serial.println("[BLE] all clients disconnected — motor stopped");
+        }
+        // Always restart advertising so the disconnected client can reconnect
         NimBLEDevice::getAdvertising()->start();
     }
 };
@@ -130,7 +136,7 @@ void BleService::init() {
 // ── Main loop work ────────────────────────────────────────────────────────────
 
 void BleService::processNotifications() {
-    if (!_connected) return;
+    if (_connectionCount == 0) return;
 
     // Drain event queue first (events take priority)
     bool sentEvent = false;
@@ -160,6 +166,9 @@ void BleService::processNotifications() {
     }
 }
 
+void BleService::clientConnected()    { _connectionCount++; }
+void BleService::clientDisconnected() { if (_connectionCount > 0) _connectionCount--; }
+
 void BleService::postEvent(const char* json) {
     eventQueue.push(json);
 }
@@ -179,13 +188,15 @@ void BleService::sendStatus() {
     snprintf(buf, sizeof(buf),
         "{\"type\":\"status\",\"pos_deg\":%.2f,\"vel_dps\":%.2f,"
         "\"target_deg\":%.2f,\"enabled\":%s,\"mode\":\"%s\","
-        "\"current_ma\":%d,\"microsteps\":%d,\"voltage_v\":%.2f,\"ts\":%lu}",
+        "\"current_ma\":%d,\"microsteps\":%d,\"voltage_v\":%.2f,"
+        "\"clients\":%d,\"ts\":%lu}",
         pos, vel, tgt,
         motorControl.getConfig().enabled ? "true" : "false",
         modeStr,
         motorControl.getConfig().currentMa,
         motorControl.getConfig().microsteps,
         readVbusVolts(),
+        _connectionCount,
         millis()
     );
 
