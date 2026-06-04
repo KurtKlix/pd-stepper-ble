@@ -49,7 +49,16 @@ Navigate to **http://localhost:8000** in any browser.
 - Motor current, microsteps, speed, closed-loop mode, direction
 - **Belt travel (mm/rev)** — set once for your pulley (GT2 20-tooth = 40 mm)
 - **Endstop type** — NO or NC, applied immediately without reflashing
-- **Apply** saves all settings
+- **Homing mode** — Endstop (microswitch) or Sensorless (StallGuard). Selecting Sensorless reveals three tuning fields:
+  - **SG Threshold (0–255)** — higher = more sensitive; fires when SG_RESULT < SGTHRS×2
+  - **Homing current (mA)** — run current during sensorless move
+  - **Homing speed (steps/s)** — step rate during sensorless move
+- **Apply** sends all settings to the firmware (no reflash needed)
+
+### Debug line (below Home button)
+- **pin** — raw GPIO 13 state: `1 (idle)` or `0 (TRIGGERED)`
+- **ISR** — cumulative endstop interrupt count (increments on every falling edge)
+- **SG X/510** — live StallGuard reading; only visible during sensorless homing
 
 ### Event Log
 - Color-coded real-time events from the motor:
@@ -58,7 +67,7 @@ Navigate to **http://localhost:8000** in any browser.
   - Yellow: `endstop`
 
 ### Homing
-- **Home (Endstop)** button — drives motor toward endstop, zeros encoder on contact
+- **Home (Endstop / Sensorless)** button — label reflects the configured mode. Drives motor toward the hard stop and zeros the encoder on trigger. No parameters needed at call time; tune via the Configuration panel.
 
 ---
 
@@ -107,7 +116,7 @@ All endpoints return JSON. Errors return HTTP 503 with `{"detail": "..."}`.
 | POST | `/api/move/relative` | `{"degrees": -45.0}` | Relative move |
 | POST | `/api/velocity` | `{"dps": 120.0}` | Velocity mode (°/s); 0 = stop |
 | POST | `/api/stop` | — | Emergency stop |
-| POST | `/api/home` | — | Start endstop homing |
+| POST | `/api/home` | — | Start homing (endstop or sensorless, per configured mode) |
 
 ### Motion — Millimetre-based
 
@@ -125,7 +134,8 @@ All mm endpoints convert to degrees internally using the current belt config.
 |--------|------|------|-------------|
 | POST | `/api/configure` | See below | Update motor settings |
 | POST | `/api/enable` | `{"enabled": true}` | Enable/disable driver |
-| POST | `/api/endstop_mode` | `{"normally_closed": false}` | Set switch polarity |
+| POST | `/api/endstop_mode` | `{"normally_closed": false}` | Set switch polarity (NO/NC) |
+| POST | `/api/homing_config` | See below | Set homing mode and sensorless parameters |
 | GET | `/api/belt` | — | Get mm/rev config |
 | POST | `/api/belt` | `{"mm_per_rev": 40.0}` | Set belt travel; persists across restarts |
 
@@ -136,9 +146,23 @@ All mm endpoints convert to degrees internally using the current belt config.
   "microsteps": 16,
   "speed_sps": 800,
   "closed_loop_type": 1,
-  "mapping_direction": 1
+  "mapping_direction": 1,
+  "home_direction": -1
 }
 ```
+
+**Homing config body** (all fields optional):
+```json
+{
+  "homing_mode": "endstop",
+  "sensorless_current_ma": 800,
+  "sgthrs": 8,
+  "sensorless_speed_sps": 1200
+}
+```
+
+`homing_mode`: `"endstop"` uses the microswitch on AUX pins 1+3; `"sensorless"` uses TMC2209 StallGuard 4.
+`sgthrs`: StallGuard threshold 0–255. Higher = more sensitive. Motor stops when `SG_RESULT < SGTHRS × 2`. Typical starting point: 8–15.
 
 ---
 
@@ -150,13 +174,19 @@ Every message is a JSON object. The `type` field identifies the message:
 
 | Type | Description | Key fields |
 |------|-------------|------------|
-| `status` | Periodic position/velocity (200 ms) | `pos_deg`, `pos_mm`, `vel_dps`, `vel_mm_s`, `voltage_v`, `mode` |
+| `status` | Periodic position/velocity (200 ms) | `pos_deg`, `pos_mm`, `vel_dps`, `vel_mm_s`, `voltage_v`, `mode`, `endstop_pin`, `endstop_isr`, `sg_result` |
 | `position_reached` | Motor settled at target | `pos_deg`, `pos_mm`, `target_deg`, `target_mm` |
-| `stall` | Step loss detected | `pos_deg`, `pos_mm` |
-| `endstop` | Switch triggered | `pos_deg`, `pos_mm` |
-| `home_complete` | Homing done, encoder zeroed | `pos_deg` (0.0) |
+| `stall` | Step loss during normal move | `pos_deg`, `pos_mm` |
+| `endstop` | Microswitch triggered | `pos_deg`, `pos_mm` |
+| `home_complete` | Homing done, encoder zeroed (both modes) | `pos_deg` (0.0) |
 | `ack` | Command acknowledged | `cmd`, `ok` |
 | `error` | Firmware error | `msg` |
+
+`mode` values in status: `"idle"` `"position"` `"velocity"` `"homing"` `"sensorless_homing"`
+
+`endstop_pin`: raw GPIO 13 state — `1` = idle, `0` = triggered.
+`endstop_isr`: cumulative ISR fire count; useful for debugging wiring.
+`sg_result`: StallGuard reading 0–510 during `sensorless_homing`; `-1` otherwise.
 
 The `pos_mm`, `target_mm`, and `vel_mm_s` fields are injected by the API using the belt config — the firmware only sends degrees.
 
