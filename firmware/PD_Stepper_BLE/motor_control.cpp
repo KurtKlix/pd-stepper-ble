@@ -87,7 +87,18 @@ void MotorControl::controlLoop() {
     }
 
     if (_mode == MotorMode::HOMING) {
-        // Velocity-driven; endstop ISR calls motorControl's stop + zero path
+        // Direct pin poll — stops the motor the instant the switch makes contact,
+        // without waiting for the ISR debounce window. The ISR will still fire
+        // afterward and post the endstop event, which is harmless.
+        if (endstop.isTriggered()) {
+            stop();
+            encoder.zero();
+            char buf[96];
+            snprintf(buf, sizeof(buf),
+                "{\"type\":\"home_complete\",\"pos_deg\":0.0,\"ts\":%lu}", millis());
+            if (_eventCb) _eventCb(buf);
+            return;
+        }
         uint32_t now = micros();
         if (_stepPeriodUs > 0 && (now - _lastStepUs) >= _stepPeriodUs) {
             _lastStepUs = now;
@@ -185,13 +196,12 @@ void MotorControl::stop() {
 }
 
 void MotorControl::startHoming() {
-    // Drive slowly toward endstop (negative direction by convention)
-    float homingDps = -(360.0f * DEFAULT_HOMING_SPEED)
-                      / (float)(DEFAULT_STEPS_PER_REV * _cfg.microsteps);
     float stepsPerSec = (float)DEFAULT_HOMING_SPEED;
     _stepPeriodUs = (uint32_t)(1000000.0f / stepsPerSec);
     _mode = MotorMode::HOMING;
-    bool forward = (_cfg.mappingDir < 0); // reverse to go toward endstop
+    // homeDir: 1 = positive (HIGH on DIR pin), -1 = negative (LOW on DIR pin).
+    // Adjust for mappingDir so "homeDir=-1" always means "toward endstop" regardless of motor orientation.
+    bool forward = ((_cfg.homeDir * _cfg.mappingDir) > 0);
     digitalWrite(PIN_DIR, forward ? HIGH : LOW);
     digitalWrite(PIN_ENABLE, LOW);
 }
@@ -237,6 +247,11 @@ void MotorControl::applyCommand(JsonDocument& doc) {
 
     } else if (strcmp(cmd, "mappingDirection") == 0) {
         _cfg.mappingDir = doc["val"].as<int>();
+
+    } else if (strcmp(cmd, "home_dir") == 0) {
+        // 1 = motor moves positive to reach endstop, -1 = negative (default)
+        int v = doc["val"].as<int>();
+        _cfg.homeDir = (v >= 0) ? 1 : -1;
 
     } else if (strcmp(cmd, "endstop_mode") == 0) {
         // 0 = NO (normally-open, active-low)

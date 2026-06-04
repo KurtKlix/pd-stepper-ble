@@ -25,6 +25,7 @@ class ConfigureRequest(BaseModel):
     speed_sps: int | None = None
     closed_loop_type: int | None = None
     mapping_direction: int | None = None
+    home_direction: int | None = None  # 1 or -1: direction motor travels to reach endstop
 
 
 class EnableRequest(BaseModel):

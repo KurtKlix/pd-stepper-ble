@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include "config.h"
 
 enum class MotorMode { IDLE, MOVING, VELOCITY, HOMING };
 
@@ -10,6 +11,7 @@ struct MotorConfig {
     int   speedSps       = 800;
     int   closedLoopType = 1;    // 0=open, 1=encoder-closed
     int   mappingDir     = 1;    // 1=normal, -1=reversed
+    int   homeDir        = DEFAULT_HOMING_DIR; // direction motor travels to reach endstop: -1 or 1
     bool  enabled        = true;
 };
 

@@ -20,37 +20,30 @@
 // ── Event callbacks (posted from ISR debounce, forwarded to BLE) ─────────────
 
 static void onStall() {
+    // StallGuard is unreliable at the slow speeds used during homing (low back-EMF).
+    // Ignore false stall triggers so they don't cut homing short before the endstop fires.
+    if (motorControl.getMode() == MotorMode::HOMING) return;
+
     char buf[128];
     snprintf(buf, sizeof(buf),
         "{\"type\":\"stall\",\"pos_deg\":%.2f,\"ts\":%lu}",
         encoder.getAbsoluteDeg(), millis());
     bleService.postEvent(buf);
 
-    // Stop motor immediately on stall
     JsonDocument doc;
     doc["cmd"] = "stop";
     motorControl.applyCommand(doc);
 }
 
 static void onEndstop() {
+    // Homing stop + zero + home_complete are handled directly in controlLoop()
+    // via pin polling, so no motor action is needed here.
+    // This callback just broadcasts the raw endstop event for logging/UI.
     char buf[128];
     snprintf(buf, sizeof(buf),
         "{\"type\":\"endstop\",\"pos_deg\":%.2f,\"ts\":%lu}",
         encoder.getAbsoluteDeg(), millis());
     bleService.postEvent(buf);
-
-    if (motorControl.getMode() == MotorMode::HOMING) {
-        // Zero encoder and stop
-        JsonDocument doc;
-        doc["cmd"] = "stop";
-        motorControl.applyCommand(doc);
-        encoder.zero();
-
-        char homeBuf[96];
-        snprintf(homeBuf, sizeof(homeBuf),
-            "{\"type\":\"home_complete\",\"pos_deg\":0.0,\"ts\":%lu}", millis());
-        bleService.postEvent(homeBuf);
-    }
 }
 
 // ── Motor event callback (position_reached generated inside motorControl) ─────

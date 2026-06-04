@@ -210,8 +210,9 @@ function startWebSocket() {
 }
 
 const voltageDisplay = document.getElementById('voltage-display');
-
-const posMmDisplay = document.getElementById('pos-display-mm');
+const posMmDisplay   = document.getElementById('pos-display-mm');
+const dbgPin         = document.getElementById('dbg-pin');
+const dbgIsr         = document.getElementById('dbg-isr');
 
 function handleMessage(msg) {
   if (msg.pos_deg !== undefined) {
@@ -224,9 +225,18 @@ function handleMessage(msg) {
     velDisplay.textContent = msg.vel_mm_s.toFixed(2);
   }
 
-  // Update voltage display
   if (msg.voltage_v !== undefined) {
     voltageDisplay.textContent = msg.voltage_v.toFixed(2) + ' V';
+  }
+
+  // Endstop debug: pin state (1=HIGH/idle, 0=LOW/triggered) and ISR fire count
+  if (msg.endstop_pin !== undefined) {
+    const triggered = msg.endstop_pin === 0;
+    dbgPin.textContent = triggered ? '0 (TRIGGERED)' : '1 (idle)';
+    dbgPin.style.color = triggered ? 'var(--green)' : 'var(--text-muted)';
+  }
+  if (msg.endstop_isr !== undefined) {
+    dbgIsr.textContent = msg.endstop_isr;
   }
 
   // Only log non-status events (or status on explicit request)

@@ -30,6 +30,11 @@
       <span id="voltage-display" style="font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums">—</span>
     </div>
     <button class="btn-primary btn-wide mt8" id="btn-home" disabled>&#x2302; Home (Endstop)</button>
+    <div id="endstop-debug" style="display:flex;gap:16px;align-items:center;margin-top:10px;font-size:13px;font-family:monospace">
+      <span style="color:var(--text-muted)">Endstop:</span>
+      <span>pin&nbsp;<span id="dbg-pin" style="font-weight:700">—</span></span>
+      <span>ISR&nbsp;<span id="dbg-isr" style="font-weight:700">—</span></span>
+    </div>
   </section>
 
   <!-- ── Position control ───────────────────────────────────────────────── -->

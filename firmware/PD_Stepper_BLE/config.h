@@ -20,7 +20,7 @@
 // ── Endstop ─────────────────────────────────────────────────────────────────
 // AUX connector GPIO 13 (AUX_RX pin repurposed when BLE mode active)
 #define PIN_ENDSTOP     13
-#define ENDSTOP_DEBOUNCE_MS 10
+#define ENDSTOP_DEBOUNCE_MS 2
 
 // ── Stall guard ─────────────────────────────────────────────────────────────
 #define STALL_DEBOUNCE_MS   50
@@ -47,6 +47,7 @@
 #define DEFAULT_MICROSTEPS      16
 #define DEFAULT_SPEED_SPS       800    // steps/sec for position moves
 #define DEFAULT_HOMING_SPEED    200    // steps/sec during homing
+#define DEFAULT_HOMING_DIR      (-1)   // -1 = negative direction, 1 = positive
 #define DEFAULT_STEPS_PER_REV   200
 
 // ── BLE ──────────────────────────────────────────────────────────────────────

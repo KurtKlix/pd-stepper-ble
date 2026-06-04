@@ -184,12 +184,12 @@ void BleService::sendStatus() {
     else if (mode == MotorMode::VELOCITY) modeStr = "velocity";
     else if (mode == MotorMode::HOMING)   modeStr = "homing";
 
-    char buf[256];
+    char buf[320];
     snprintf(buf, sizeof(buf),
         "{\"type\":\"status\",\"pos_deg\":%.2f,\"vel_dps\":%.2f,"
         "\"target_deg\":%.2f,\"enabled\":%s,\"mode\":\"%s\","
         "\"current_ma\":%d,\"microsteps\":%d,\"voltage_v\":%.2f,"
-        "\"clients\":%d,\"ts\":%lu}",
+        "\"clients\":%d,\"endstop_isr\":%lu,\"endstop_pin\":%d,\"ts\":%lu}",
         pos, vel, tgt,
         motorControl.getConfig().enabled ? "true" : "false",
         modeStr,
@@ -197,6 +197,8 @@ void BleService::sendStatus() {
         motorControl.getConfig().microsteps,
         readVbusVolts(),
         _connectionCount,
+        g_endstopIsrCount,
+        digitalRead(PIN_ENDSTOP),
         millis()
     );
 

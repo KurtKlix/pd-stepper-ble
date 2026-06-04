@@ -156,11 +156,12 @@ async def home():
 async def configure(req: ConfigureRequest):
     """Apply partial configuration update."""
     field_map = {
-        "current_ma":      "current",
-        "microsteps":      "microsteps",
-        "speed_sps":       "speed",
-        "closed_loop_type":"closed_loop_type",
+        "current_ma":       "current",
+        "microsteps":       "microsteps",
+        "speed_sps":        "speed",
+        "closed_loop_type": "closed_loop_type",
         "mapping_direction":"mappingDirection",
+        "home_direction":   "home_dir",
     }
     try:
         for field, cmd in field_map.items():

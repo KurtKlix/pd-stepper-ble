@@ -55,7 +55,7 @@ The stock PD-Stepper firmware supports USB Serial and WiFi. This project adds:
 - **Motor** — NEMA 17 with 6-pin JST PH connector (e.g. Hanpose 17HS3401S)
 
 Optional:
-- **Endstop switch** — NO or NC microswitch, wired to the AUX connector (pins 2 + 3)
+- **Endstop switch** — NO or NC microswitch, wired to the AUX connector (pins 1 + 3; pin 1 = GND, pin 3 = signal GPIO 13)
 - **GT2 belt + pulley** — for linear positioning in mm
 
 ## Quick Start

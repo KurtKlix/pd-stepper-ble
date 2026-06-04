@@ -37,10 +37,12 @@ Arduino sketch for the ESP32-S3 that replaces the stock serial/WiFi interface wi
 
 ### AUX Connector (JST SH 1 mm, 3-pin)
 
+Pin 1 is closest to the USB-C port.
+
 ```
-Pin 1  →  GPIO 14  (unused in BLE mode)
-Pin 2  →  GPIO 13  ← endstop signal wire
-Pin 3  →  GND      ← other endstop wire
+Pin 1  →  GND      ← endstop GND wire   (switch C terminal)
+Pin 2  →  GPIO 14  (unused in BLE mode)
+Pin 3  →  GPIO 13  ← endstop signal wire (switch NO terminal)
 ```
 
 Both NO and NC switches wire the same way. Polarity is set via the `endstop_mode` BLE command.

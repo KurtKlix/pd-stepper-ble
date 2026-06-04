@@ -24,3 +24,4 @@ extern Endstop endstop;
 
 extern volatile bool     g_endstopPending;
 extern volatile uint32_t g_endstopTime;
+extern volatile uint32_t g_endstopIsrCount;  // total ISR fires — for debug
