@@ -134,7 +134,7 @@ Write JSON strings to the **Command** characteristic.
 | `deg_rel` | `{"cmd":"deg_rel","val":-45.0}` | Move relative (degrees) |
 | `vel` | `{"cmd":"vel","val":120.0}` | Velocity mode (°/s); negative = reverse |
 | `stop` | `{"cmd":"stop"}` | Immediate stop |
-| `home` | `{"cmd":"home"}` | Drive toward endstop, zero encoder on trigger |
+| `home` | `{"cmd":"home"}` | Home using configured homing mode |
 
 ### Configuration
 
@@ -148,6 +148,16 @@ Write JSON strings to the **Command** characteristic.
 | `mappingDirection` | `{"cmd":"mappingDirection","val":-1}` | 1 = normal, -1 = reversed |
 | `endstop_mode` | `{"cmd":"endstop_mode","val":0}` | 0 = NO switch, 1 = NC switch |
 | `status` | `{"cmd":"status"}` | Request immediate status push |
+
+### Homing
+
+| Command | Example | Description |
+|---------|---------|-------------|
+| `homing_mode` | `{"cmd":"homing_mode","val":0}` | 0 = endstop, 1 = sensorless (StallGuard) |
+| `home_dir` | `{"cmd":"home_dir","val":-1}` | Direction toward endstop: -1 or 1 |
+| `sensorless_current` | `{"cmd":"sensorless_current","val":800}` | Run current during sensorless homing (mA) |
+| `sgthrs` | `{"cmd":"sgthrs","val":8}` | StallGuard threshold 0–255 (higher = more sensitive; fires when SG_RESULT < SGTHRS×2) |
+| `sensorless_speed` | `{"cmd":"sensorless_speed","val":1200}` | Step rate during sensorless homing (steps/sec) |
 
 ---
 
@@ -168,11 +178,17 @@ The **Status** characteristic notifies JSON objects.
   "current_ma": 800,
   "microsteps": 16,
   "voltage_v": 19.96,
+  "clients": 1,
+  "endstop_isr": 3,
+  "endstop_pin": 1,
+  "sg_result": -1,
   "ts": 12345
 }
 ```
 
-`mode` values: `"idle"` `"position"` `"velocity"` `"homing"`
+`mode` values: `"idle"` `"position"` `"velocity"` `"homing"` `"sensorless_homing"`
+
+`sg_result` is the live StallGuard reading (0–510) during sensorless homing only; `-1` otherwise.
 
 ### Motion Events
 
@@ -198,7 +214,10 @@ The **Status** characteristic notifies JSON objects.
   "mapping_dir": 1,
   "endstop_gpio": 13,
   "endstop_mode": "NO",
-  "stallguard_threshold": 50,
+  "homing_mode": "endstop",
+  "sensorless_current_ma": 800,
+  "sgthrs": 8,
+  "sensorless_speed_sps": 1200,
   "voltage_v": 19.96,
   "pd_target_v": 20
 }
@@ -232,18 +251,16 @@ And update the CFG pin states in `motor_control.cpp` `init()` accordingly:
 ## Endstop Wiring
 
 ```
-Microswitch ──────────┐
-                       │
-AUX Pin 2 (GPIO 13) ──┤
-AUX Pin 3 (GND)    ───┘
-
-NO switch: open at rest, closes when triggered
-NC switch: closed at rest, opens when triggered
+Microswitch (C terminal)  ── AUX Pin 1 (GND,      closest to USB-C)
+Microswitch (NO terminal) ── AUX Pin 3 (GPIO 13,   farthest from USB-C)
+AUX Pin 2 (GPIO 14) — leave unconnected
 ```
+
+NO switch recommended: open at rest, closes on trigger → FALLING edge on GPIO 13.
 
 Set switch type via BLE command (no reflash needed):
 ```json
-{"cmd": "endstop_mode", "val": 0}   // NO
+{"cmd": "endstop_mode", "val": 0}   // NO (default)
 {"cmd": "endstop_mode", "val": 1}   // NC
 ```
 

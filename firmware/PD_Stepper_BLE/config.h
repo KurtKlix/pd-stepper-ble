@@ -46,8 +46,11 @@
 #define DEFAULT_HOLD_CURRENT_MA 200    // standstill current (reduces heat)
 #define DEFAULT_MICROSTEPS      16
 #define DEFAULT_SPEED_SPS       800    // steps/sec for position moves
-#define DEFAULT_HOMING_SPEED    200    // steps/sec during homing
-#define DEFAULT_HOMING_DIR      (-1)   // -1 = negative direction, 1 = positive
+#define DEFAULT_HOMING_SPEED        200    // steps/sec during endstop homing
+#define DEFAULT_HOMING_DIR          (-1)   // -1 = negative direction, 1 = positive
+#define DEFAULT_SENSORLESS_SPEED    1200   // steps/sec during sensorless homing
+#define DEFAULT_SENSORLESS_CUR_MA   800    // run current during sensorless homing
+#define DEFAULT_SGTHRS              8      // StallGuard threshold (0-255, higher = more sensitive, fires when SG_RESULT < SGTHRS*2)
 #define DEFAULT_STEPS_PER_REV   200
 
 // ── BLE ──────────────────────────────────────────────────────────────────────

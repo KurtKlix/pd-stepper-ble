@@ -36,6 +36,13 @@ class EndstopModeRequest(BaseModel):
     normally_closed: bool  # False = NO (default), True = NC
 
 
+class HomingConfigRequest(BaseModel):
+    homing_mode: str | None = None            # "endstop" or "sensorless"
+    sensorless_current_ma: int | None = None  # run current during sensorless move (mA)
+    sgthrs: int | None = None                 # StallGuard threshold 0-255 (higher = more sensitive, fires when SG_RESULT < SGTHRS*2)
+    sensorless_speed_sps: int | None = None   # steps/sec during sensorless homing
+
+
 class BeltConfigRequest(BaseModel):
     mm_per_rev: float = Field(gt=0, description="Linear travel per motor revolution (mm)")
 

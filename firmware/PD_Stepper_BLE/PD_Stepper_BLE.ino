@@ -20,9 +20,10 @@
 // ── Event callbacks (posted from ISR debounce, forwarded to BLE) ─────────────
 
 static void onStall() {
-    // StallGuard is unreliable at the slow speeds used during homing (low back-EMF).
-    // Ignore false stall triggers so they don't cut homing short before the endstop fires.
-    if (motorControl.getMode() == MotorMode::HOMING) return;
+    // Both homing modes handle stall/stop via direct pin polling in controlLoop().
+    // Suppress the debounced ISR path so it doesn't interfere.
+    MotorMode m = motorControl.getMode();
+    if (m == MotorMode::HOMING || m == MotorMode::SENSORLESS_HOMING) return;
 
     char buf[128];
     snprintf(buf, sizeof(buf),

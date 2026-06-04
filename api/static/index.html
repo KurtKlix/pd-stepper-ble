@@ -29,11 +29,12 @@
       <span style="color:var(--text-muted)">Bus voltage:</span>
       <span id="voltage-display" style="font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums">—</span>
     </div>
-    <button class="btn-primary btn-wide mt8" id="btn-home" disabled>&#x2302; Home (Endstop)</button>
+    <button class="btn-primary btn-wide mt8" id="btn-home" disabled>&#x2302; Home</button>
     <div id="endstop-debug" style="display:flex;gap:16px;align-items:center;margin-top:10px;font-size:13px;font-family:monospace">
       <span style="color:var(--text-muted)">Endstop:</span>
       <span>pin&nbsp;<span id="dbg-pin" style="font-weight:700">—</span></span>
       <span>ISR&nbsp;<span id="dbg-isr" style="font-weight:700">—</span></span>
+      <span id="dbg-sg-wrap" style="display:none">SG&nbsp;<span id="dbg-sg" style="font-weight:700">—</span><span style="color:var(--text-muted)">/510</span></span>
     </div>
   </section>
 
@@ -125,10 +126,36 @@
           <option value="NC">NC — Normally Closed</option>
         </select>
       </div>
-      <div style="display:flex;align-items:flex-end">
-        <button class="btn-primary btn-wide" id="btn-apply-cfg" disabled>Apply</button>
+      <div>
+        <label>Homing mode</label>
+        <select id="cfg-homing-mode">
+          <option value="endstop" selected>Endstop (microswitch)</option>
+          <option value="sensorless">Sensorless (StallGuard)</option>
+        </select>
       </div>
     </div>
+
+    <div id="sensorless-cfg" style="display:none;margin-top:10px">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">
+        Sensorless tuning — higher threshold = triggers more easily; lower current = less force at hard stop
+      </div>
+      <div class="config-grid">
+        <div>
+          <label>SG Threshold (0-255, higher = more sensitive)</label>
+          <input type="number" id="cfg-sgthrs" value="8" min="0" max="255" step="1">
+        </div>
+        <div>
+          <label>Homing current (mA)</label>
+          <input type="number" id="cfg-sensorless-current" value="800" min="50" max="3000" step="50">
+        </div>
+        <div>
+          <label>Homing speed (steps/s)</label>
+          <input type="number" id="cfg-sensorless-speed" value="1200" min="50" max="3000" step="50">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-primary btn-wide mt8" id="btn-apply-cfg" disabled>Apply</button>
   </section>
 
   <!-- ── Event log ──────────────────────────────────────────────────────── -->

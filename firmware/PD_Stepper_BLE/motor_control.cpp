@@ -47,7 +47,7 @@ void MotorControl::init(MotorEventCallback cb) {
     driver.rms_current(_cfg.currentMa);
     driver.microsteps(_cfg.microsteps);
     driver.pwm_autoscale(true);
-    driver.SGTHRS(50);  // StallGuard threshold
+    driver.SGTHRS(_cfg.sgthrs);
     // Reduce current to DEFAULT_HOLD_CURRENT_MA when motor is idle.
     // IHOLDDELAY: time to ramp down after move (units of 2^18 clock cycles)
     driver.iholddelay(10);
@@ -88,10 +88,58 @@ void MotorControl::controlLoop() {
 
     if (_mode == MotorMode::HOMING) {
         // Direct pin poll — stops the motor the instant the switch makes contact,
-        // without waiting for the ISR debounce window. The ISR will still fire
-        // afterward and post the endstop event, which is harmless.
+        // without waiting for the ISR debounce window.
         if (endstop.isTriggered()) {
             stop();
+            encoder.zero();
+            char buf[96];
+            snprintf(buf, sizeof(buf),
+                "{\"type\":\"home_complete\",\"pos_deg\":0.0,\"ts\":%lu}", millis());
+            if (_eventCb) _eventCb(buf);
+            return;
+        }
+        uint32_t now = micros();
+        if (_stepPeriodUs > 0 && (now - _lastStepUs) >= _stepPeriodUs) {
+            _lastStepUs = now;
+            digitalWrite(PIN_STEP, HIGH);
+            delayMicroseconds(2);
+            digitalWrite(PIN_STEP, LOW);
+        }
+        return;
+    }
+
+    if (_mode == MotorMode::SENSORLESS_HOMING) {
+        // Give StealthChop ~500 ms to calibrate its current waveform before
+        // watching DIAG — avoids false stall triggers at startup.
+        if (!_sgSettled) {
+            if (millis() - _sgSettleStart >= 500) _sgSettled = true;
+            else {
+                uint32_t now = micros();
+                if (_stepPeriodUs > 0 && (now - _lastStepUs) >= _stepPeriodUs) {
+                    _lastStepUs = now;
+                    digitalWrite(PIN_STEP, HIGH);
+                    delayMicroseconds(2);
+                    digitalWrite(PIN_STEP, LOW);
+                }
+                return;
+            }
+        }
+        // Read SG_RESULT via UART every 10 ms and compare directly.
+        // Require 3 consecutive reads below threshold before declaring stall —
+        // resonance dips are brief (1-2 reads) while a real hard stop is sustained.
+        if (millis() - _lastSgMs >= 10) {
+            _lastSgMs  = millis();
+            _lastSgVal = (int)driver.SG_RESULT();
+            if (_lastSgVal < _cfg.sgthrs * 2) {
+                _sgLowCount++;
+            } else {
+                _sgLowCount = 0;
+            }
+        }
+        if (_sgLowCount >= 3) {
+            stop();
+            driver.rms_current(_cfg.currentMa);
+            driver.TCOOLTHRS(0);
             encoder.zero();
             char buf[96];
             snprintf(buf, sizeof(buf),
@@ -196,14 +244,45 @@ void MotorControl::stop() {
 }
 
 void MotorControl::startHoming() {
-    float stepsPerSec = (float)DEFAULT_HOMING_SPEED;
-    _stepPeriodUs = (uint32_t)(1000000.0f / stepsPerSec);
+    if (_cfg.homingMode == HomingMode::SENSORLESS)
+        startSensorlessHoming();
+    else
+        startEndstopHoming();
+}
+
+void MotorControl::startEndstopHoming() {
+    _stepPeriodUs = (uint32_t)(1000000.0f / (float)DEFAULT_HOMING_SPEED);
     _mode = MotorMode::HOMING;
-    // homeDir: 1 = positive (HIGH on DIR pin), -1 = negative (LOW on DIR pin).
-    // Adjust for mappingDir so "homeDir=-1" always means "toward endstop" regardless of motor orientation.
     bool forward = ((_cfg.homeDir * _cfg.mappingDir) > 0);
     digitalWrite(PIN_DIR, forward ? HIGH : LOW);
     digitalWrite(PIN_ENABLE, LOW);
+}
+
+void MotorControl::startSensorlessHoming() {
+    // TMC2209 StallGuard 4 requires StealthChop — do NOT switch to SpreadCycle.
+    // SG4 is disabled in SpreadCycle mode on this chip.
+    driver.rms_current(_cfg.sensorlessCurMa);
+    driver.SGTHRS(_cfg.sgthrs);
+    // TCOOLTHRS must be non-zero for the DIAG pin to output StallGuard.
+    // 0xFFFFF (20-bit max) enables it at all practical operating speeds.
+    driver.TCOOLTHRS(0xFFFFF);
+    _stepPeriodUs  = (uint32_t)(1000000.0f / (float)_cfg.sensorlessSpeedSps);
+    _sgSettleStart = millis();
+    _sgSettled     = false;
+    _lastSgVal     = 510;
+    _lastSgMs      = 0;
+    _sgLowCount    = 0;
+    _mode          = MotorMode::SENSORLESS_HOMING;
+    bool forward = ((_cfg.homeDir * _cfg.mappingDir) > 0);
+    digitalWrite(PIN_DIR, forward ? HIGH : LOW);
+    digitalWrite(PIN_ENABLE, LOW);
+}
+
+int MotorControl::getSgResult() {
+    // During sensorless homing, return the cached value from the control loop
+    // to avoid a redundant UART read. Otherwise do a fresh read.
+    if (_mode == MotorMode::SENSORLESS_HOMING) return _lastSgVal;
+    return (int)driver.SG_RESULT();
 }
 
 void MotorControl::applyCommand(JsonDocument& doc) {
@@ -252,6 +331,21 @@ void MotorControl::applyCommand(JsonDocument& doc) {
         // 1 = motor moves positive to reach endstop, -1 = negative (default)
         int v = doc["val"].as<int>();
         _cfg.homeDir = (v >= 0) ? 1 : -1;
+
+    } else if (strcmp(cmd, "homing_mode") == 0) {
+        _cfg.homingMode = (doc["val"].as<int>() == 1)
+                          ? HomingMode::SENSORLESS
+                          : HomingMode::ENDSTOP;
+
+    } else if (strcmp(cmd, "sensorless_current") == 0) {
+        _cfg.sensorlessCurMa = doc["val"].as<int>();
+
+    } else if (strcmp(cmd, "sgthrs") == 0) {
+        _cfg.sgthrs = doc["val"].as<int>();
+        driver.SGTHRS(_cfg.sgthrs);
+
+    } else if (strcmp(cmd, "sensorless_speed") == 0) {
+        _cfg.sensorlessSpeedSps = doc["val"].as<int>();
 
     } else if (strcmp(cmd, "endstop_mode") == 0) {
         // 0 = NO (normally-open, active-low)

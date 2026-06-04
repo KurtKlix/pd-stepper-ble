@@ -119,7 +119,7 @@ void BleService::init() {
         BLE_CONFIG_UUID,
         NIMBLE_PROPERTY::READ
     );
-    char cfgBuf[256];
+    char cfgBuf[384];
     buildConfigJson(cfgBuf, sizeof(cfgBuf));
     _pConfigChar->setValue(cfgBuf);
 
@@ -180,16 +180,22 @@ void BleService::sendStatus() {
     MotorMode mode = motorControl.getMode();
 
     const char* modeStr = "idle";
-    if      (mode == MotorMode::MOVING)   modeStr = "position";
-    else if (mode == MotorMode::VELOCITY) modeStr = "velocity";
-    else if (mode == MotorMode::HOMING)   modeStr = "homing";
+    if      (mode == MotorMode::MOVING)            modeStr = "position";
+    else if (mode == MotorMode::VELOCITY)           modeStr = "velocity";
+    else if (mode == MotorMode::HOMING)             modeStr = "homing";
+    else if (mode == MotorMode::SENSORLESS_HOMING)  modeStr = "sensorless_homing";
 
-    char buf[320];
+    // Only read SG_RESULT via UART when sensorless homing is active — avoids
+    // adding a UART round-trip to every status packet during normal operation.
+    int sgResult = (mode == MotorMode::SENSORLESS_HOMING) ? motorControl.getSgResult() : -1;
+
+    char buf[352];
     snprintf(buf, sizeof(buf),
         "{\"type\":\"status\",\"pos_deg\":%.2f,\"vel_dps\":%.2f,"
         "\"target_deg\":%.2f,\"enabled\":%s,\"mode\":\"%s\","
         "\"current_ma\":%d,\"microsteps\":%d,\"voltage_v\":%.2f,"
-        "\"clients\":%d,\"endstop_isr\":%lu,\"endstop_pin\":%d,\"ts\":%lu}",
+        "\"clients\":%d,\"endstop_isr\":%lu,\"endstop_pin\":%d,"
+        "\"sg_result\":%d,\"ts\":%lu}",
         pos, vel, tgt,
         motorControl.getConfig().enabled ? "true" : "false",
         modeStr,
@@ -199,6 +205,7 @@ void BleService::sendStatus() {
         _connectionCount,
         g_endstopIsrCount,
         digitalRead(PIN_ENDSTOP),
+        sgResult,
         millis()
     );
 
@@ -212,14 +219,17 @@ void BleService::buildConfigJson(char* buf, size_t len) {
         "{\"fw_ver\":\"%s\",\"device\":\"%s\","
         "\"current_ma\":%d,\"microsteps\":%d,\"speed_sps\":%d,"
         "\"closed_loop\":%d,\"mapping_dir\":%d,"
-        "\"endstop_gpio\":%d,\"stallguard_threshold\":50,"
-        "\"voltage_v\":%.2f,\"pd_target_v\":%d,"
-        "\"endstop_mode\":\"%s\"}",
+        "\"endstop_gpio\":%d,\"endstop_mode\":\"%s\","
+        "\"homing_mode\":\"%s\","
+        "\"sensorless_current_ma\":%d,\"sgthrs\":%d,\"sensorless_speed_sps\":%d,"
+        "\"voltage_v\":%.2f,\"pd_target_v\":%d}",
         FW_VERSION, BLE_DEVICE_NAME,
         cfg.currentMa, cfg.microsteps, cfg.speedSps,
         cfg.closedLoopType, cfg.mappingDir,
         PIN_ENDSTOP,
-        readVbusVolts(), PD_VOLTAGE,
-        (endstop.getMode() == EndstopMode::NO) ? "NO" : "NC"
+        (endstop.getMode() == EndstopMode::NO) ? "NO" : "NC",
+        (cfg.homingMode == HomingMode::SENSORLESS) ? "sensorless" : "endstop",
+        cfg.sensorlessCurMa, cfg.sgthrs, cfg.sensorlessSpeedSps,
+        readVbusVolts(), PD_VOLTAGE
     );
 }

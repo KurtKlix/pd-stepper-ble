@@ -160,15 +160,28 @@ async function loadConfig() {
       api('GET', '/api/config'),
       api('GET', '/api/belt'),
     ]);
-    document.getElementById('cfg-current').value        = cfg.current_ma   ?? 800;
-    document.getElementById('cfg-microsteps').value     = cfg.microsteps   ?? 16;
-    document.getElementById('cfg-speed').value          = cfg.speed_sps    ?? 800;
-    document.getElementById('cfg-closed-loop').value    = cfg.closed_loop  ?? 1;
-    document.getElementById('cfg-dir').value            = cfg.mapping_dir  ?? 1;
-    document.getElementById('cfg-endstop-mode').value   = cfg.endstop_mode ?? 'NO';
-    document.getElementById('cfg-mm-per-rev').value     = belt.mm_per_rev  ?? 40;
+    document.getElementById('cfg-current').value           = cfg.current_ma          ?? 800;
+    document.getElementById('cfg-microsteps').value        = cfg.microsteps          ?? 16;
+    document.getElementById('cfg-speed').value             = cfg.speed_sps           ?? 800;
+    document.getElementById('cfg-closed-loop').value       = cfg.closed_loop         ?? 1;
+    document.getElementById('cfg-dir').value               = cfg.mapping_dir         ?? 1;
+    document.getElementById('cfg-endstop-mode').value      = cfg.endstop_mode        ?? 'NO';
+    document.getElementById('cfg-mm-per-rev').value        = belt.mm_per_rev         ?? 40;
+    document.getElementById('cfg-homing-mode').value       = cfg.homing_mode         ?? 'endstop';
+    document.getElementById('cfg-sgthrs').value            = cfg.sgthrs              ?? 50;
+    document.getElementById('cfg-sensorless-current').value= cfg.sensorless_current_ma ?? 400;
+    document.getElementById('cfg-sensorless-speed').value  = cfg.sensorless_speed_sps  ?? 400;
+    updateSensorlessCfgVisibility();
   } catch (_) { /* device may not respond immediately */ }
 }
+
+function updateSensorlessCfgVisibility() {
+  const sensorless = document.getElementById('cfg-homing-mode').value === 'sensorless';
+  document.getElementById('sensorless-cfg').style.display = sensorless ? 'block' : 'none';
+  btnHome.textContent = sensorless ? '⌂ Home (Sensorless)' : '⌂ Home (Endstop)';
+}
+
+document.getElementById('cfg-homing-mode').addEventListener('change', updateSensorlessCfgVisibility);
 
 btnApplyCfg.addEventListener('click', async () => {
   const body = {
@@ -178,13 +191,20 @@ btnApplyCfg.addEventListener('click', async () => {
     closed_loop_type: parseInt(document.getElementById('cfg-closed-loop').value),
     mapping_direction:parseInt(document.getElementById('cfg-dir').value),
   };
+  const homingBody = {
+    homing_mode:           document.getElementById('cfg-homing-mode').value,
+    sgthrs:                parseInt(document.getElementById('cfg-sgthrs').value),
+    sensorless_current_ma: parseInt(document.getElementById('cfg-sensorless-current').value),
+    sensorless_speed_sps:  parseInt(document.getElementById('cfg-sensorless-speed').value),
+  };
   try {
     await api('POST', '/api/configure', body);
     const mode = document.getElementById('cfg-endstop-mode').value;
     await api('POST', '/api/endstop_mode', { normally_closed: mode === 'NC' });
+    await api('POST', '/api/homing_config', homingBody);
     const mmPerRev = parseFloat(document.getElementById('cfg-mm-per-rev').value);
     await api('POST', '/api/belt', { mm_per_rev: mmPerRev });
-    logEvent({ type: 'ack', msg: `Config applied — ${mmPerRev}mm/rev, endstop: ${mode}` });
+    logEvent({ type: 'ack', msg: `Config applied — homing: ${homingBody.homing_mode}, endstop: ${mode}` });
   } catch(e) {
     logEvent({ type: 'error', msg: e.message });
   }
@@ -213,6 +233,8 @@ const voltageDisplay = document.getElementById('voltage-display');
 const posMmDisplay   = document.getElementById('pos-display-mm');
 const dbgPin         = document.getElementById('dbg-pin');
 const dbgIsr         = document.getElementById('dbg-isr');
+const dbgSgWrap      = document.getElementById('dbg-sg-wrap');
+const dbgSg          = document.getElementById('dbg-sg');
 
 function handleMessage(msg) {
   if (msg.pos_deg !== undefined) {
@@ -237,6 +259,18 @@ function handleMessage(msg) {
   }
   if (msg.endstop_isr !== undefined) {
     dbgIsr.textContent = msg.endstop_isr;
+  }
+
+  // SG_RESULT: only shown during sensorless homing (firmware sends -1 otherwise)
+  if (msg.sg_result !== undefined && msg.sg_result >= 0) {
+    dbgSgWrap.style.display = 'inline';
+    dbgSg.textContent = msg.sg_result;
+    // Colour: green when high (no load), red when low (high load / near stall)
+    dbgSg.style.color = msg.sg_result < 50  ? 'var(--red)'
+                      : msg.sg_result < 150 ? 'orange'
+                      : 'var(--green)';
+  } else if (msg.sg_result === -1) {
+    dbgSgWrap.style.display = 'none';
   }
 
   // Only log non-status events (or status on explicit request)

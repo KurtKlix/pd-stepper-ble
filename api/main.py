@@ -19,6 +19,7 @@ from models import (
     DeviceInfo,
     EnableRequest,
     EndstopModeRequest,
+    HomingConfigRequest,
     MoveAbsoluteMmRequest,
     MoveAbsoluteRequest,
     MoveRelativeMmRequest,
@@ -232,6 +233,24 @@ async def set_velocity_mm(req: SetVelocityMmRequest):
         dps = belt_config.mm_to_deg(req.mm_per_s)
         await ble_manager.send_command({"cmd": "vel", "val": dps})
         return {"ok": True, "mm_per_s": req.mm_per_s, "dps": round(dps, 4)}
+    except BleakError as exc:
+        raise _ble_error(exc)
+
+
+@app.post("/api/homing_config")
+async def homing_config(req: HomingConfigRequest):
+    """Set homing mode (endstop/sensorless) and tune sensorless parameters."""
+    try:
+        if req.homing_mode is not None:
+            val = 1 if req.homing_mode == "sensorless" else 0
+            await ble_manager.send_command({"cmd": "homing_mode", "val": val})
+        if req.sensorless_current_ma is not None:
+            await ble_manager.send_command({"cmd": "sensorless_current", "val": req.sensorless_current_ma})
+        if req.sgthrs is not None:
+            await ble_manager.send_command({"cmd": "sgthrs", "val": req.sgthrs})
+        if req.sensorless_speed_sps is not None:
+            await ble_manager.send_command({"cmd": "sensorless_speed", "val": req.sensorless_speed_sps})
+        return {"ok": True}
     except BleakError as exc:
         raise _ble_error(exc)
 
