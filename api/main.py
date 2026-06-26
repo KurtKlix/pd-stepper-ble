@@ -292,4 +292,6 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
 
-    uvicorn.run("main:app", host=args.host, port=args.port, log_level="info")
+    # Pass the app object (not the "main:app" import string) so the frozen PyInstaller exe works —
+    # uvicorn cannot re-import "main" inside a onefile bundle (entry runs as __main__).
+    uvicorn.run(app, host=args.host, port=args.port, log_level="info")

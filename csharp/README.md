@@ -106,6 +106,8 @@ Task ConfigureAsync(ConfigureRequest config, CancellationToken ct)
 Task SetEnabledAsync(bool enabled, CancellationToken ct)
 Task ConfigureBeltAsync(double mmPerRev, CancellationToken ct)
 Task<(double MmPerRev, double MmPerDeg)> GetBeltConfigAsync(CancellationToken ct)
+Task SetEndstopModeAsync(bool normallyClosed, CancellationToken ct)   // NO (false) / NC (true), no reflash
+Task ConfigureHomingAsync(HomingConfigRequest config, CancellationToken ct)
 ```
 
 **ConfigureRequest** — all fields nullable (omit to leave unchanged):
@@ -117,6 +119,18 @@ new ConfigureRequest
     SpeedSps         = 800,   // position move speed (steps/sec)
     ClosedLoopType   = 1,     // 0=open loop, 1=encoder closed
     MappingDirection = 1,     // 1=normal, -1=reversed
+    HomeDirection    = -1,    // 1 or -1: direction the motor travels to reach the endstop
+}
+```
+
+**HomingConfigRequest** — all fields nullable; switch homing mode and tune sensorless StallGuard:
+```csharp
+new HomingConfigRequest
+{
+    HomingMode          = "sensorless", // "endstop" (microswitch) or "sensorless" (StallGuard)
+    Sgthrs              = 10,            // StallGuard threshold 0-255 (higher = more sensitive)
+    SensorlessCurrentMa = 800,          // run current during the sensorless homing move
+    SensorlessSpeedSps  = 1200,         // step rate during the sensorless homing move
 }
 ```
 
@@ -164,7 +178,11 @@ record StepperEvent(
     string?  Message,     // error message text
     string?  Cmd,         // command name (in ack events)
     bool?    Ok,          // command success (in ack events)
-    long     Timestamp    // firmware millis() timestamp
+    long     Timestamp,   // firmware millis() timestamp
+    string?  Mode,        // status: idle / position / velocity / homing / sensorless_homing
+    int?     EndstopPin,  // status: raw endstop GPIO — 1 = idle, 0 = triggered
+    long?    EndstopIsr,  // status: cumulative endstop interrupt count
+    int?     SgResult     // status: StallGuard reading 0-510 during sensorless homing, else -1
 )
 ```
 
