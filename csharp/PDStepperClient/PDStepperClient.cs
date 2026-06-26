@@ -180,6 +180,20 @@ public sealed class PDStepperClient : IDisposable
         res.EnsureSuccessStatusCode();
     }
 
+    /// <summary>Set the endstop switch polarity (NO/NC) — applied immediately, no reflash. POST /api/endstop_mode.</summary>
+    public async Task SetEndstopModeAsync(bool normallyClosed, CancellationToken ct = default)
+    {
+        var res = await _http.PostAsJsonAsync("api/endstop_mode", new { normally_closed = normallyClosed }, _json, ct);
+        res.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>Set homing mode (endstop/sensorless) and tune sensorless StallGuard params. POST /api/homing_config.</summary>
+    public async Task ConfigureHomingAsync(HomingConfigRequest config, CancellationToken ct = default)
+    {
+        var res = await _http.PostAsJsonAsync("api/homing_config", config, _json, ct);
+        res.EnsureSuccessStatusCode();
+    }
+
     // ── WebSocket event stream ────────────────────────────────────────────────
 
     /// <summary>
@@ -255,7 +269,11 @@ public sealed class PDStepperClient : IDisposable
             Message:    json.GetStringOrNull("msg"),
             Cmd:        json.GetStringOrNull("cmd"),
             Ok:         json.GetBoolOrNull("ok"),
-            Timestamp:  json.GetLongOrNull("ts") ?? 0
+            Timestamp:  json.GetLongOrNull("ts") ?? 0,
+            Mode:       json.GetStringOrNull("mode"),
+            EndstopPin: (int?)json.GetLongOrNull("endstop_pin"),
+            EndstopIsr: json.GetLongOrNull("endstop_isr"),
+            SgResult:   (int?)json.GetLongOrNull("sg_result")
         );
     }
 
